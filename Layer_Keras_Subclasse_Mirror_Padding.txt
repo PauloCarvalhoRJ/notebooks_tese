@@ -1,0 +1,60 @@
+
+
+Fonte: https://stackoverflow.com/questions/49189496/can-symmetrically-paddding-be-done-in-convolution-layers-in-keras
+
+import keras.backend as K
+from keras.layers import Layer
+
+class SymmetricPadding2D(Layer):
+
+    def __init__(self, output_dim, padding=[1,1], 
+                 data_format="channels_last", **kwargs):
+        self.output_dim = output_dim
+        self.data_format = data_format
+        self.padding = padding
+        super(SymmetricPadding2D, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        super(SymmetricPadding2D, self).build(input_shape)
+
+    def call(self, inputs):
+        if self.data_format is "channels_last":
+            #(batch, depth, rows, cols, channels)
+            pad = [[0,0]] + [[i,i] for i in self.padding] + [[0,0]]
+        elif self.data_format is "channels_first":
+            #(batch, channels, depth, rows, cols)
+            pad = [[0, 0], [0, 0]] + [[i,i] for i in self.padding]
+
+        if K.backend() == "tensorflow":
+            import tensorflow as tf
+            paddings = tf.constant(pad)
+            out = tf.pad(inputs, paddings, "REFLECT")
+        else:
+            raise Exception("Backend " + K.backend() + "not implemented")
+        return out 
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], self.output_dim)
+
+if __name__ == "__main__":
+
+    from keras.models import Sequential
+    import numpy as np
+
+    #Set Image
+    image = [[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]]
+
+    # Pad to "channels_last format 
+    # which is [batch, width, height, channels]=[1,4,4,1]
+    image = np.expand_dims(np.expand_dims(np.array(image),2),0)
+
+
+    #Build Keras model
+    model = Sequential()
+    model.add(SymmetricPadding2D(1, input_shape=(4,4,1)))
+    model.build()
+
+    # To simply apply existing filter, we use predict with no training
+    out = model.predict(image)
+    print(out[0,:,:,0])
+
